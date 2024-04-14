@@ -1,0 +1,169 @@
+---
+title: "Homework 4: Probabilistic Calibration and Model Selection"
+subtitle: "BEE 4850/5850, Fall 2024"
+format:
+    html:        
+        warning: true
+        error: true
+        fig-format: svg
+    pdf:
+        warning: true
+        error: true
+        keep-tex: true
+        fig-format: svg    
+        include-in-header: 
+            text: |
+                \usepackage{fvextra}
+                \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+        include-before-body:
+            text: |
+                \RecustomVerbatimEnvironment{verbatim}{Verbatim}{
+                showspaces = false,
+                showtabs = false,
+                breaksymbolleft={},
+                breaklines
+                % Note: setting commandchars=\\\{\} here will cause an error 
+                }
+    ipynb:
+        warning: true
+        error: true
+jupyter: julia-1.9
+format-links: [pdf]
+freeze: false
+---
+
+::: {.content-visible when-format="ipynb"}
+**Name**:
+
+**ID**:
+:::
+
+::: {.callout-important icon=false}
+### Due Date
+
+Friday, 5/03/24, 9:00pm
+:::
+
+::: {.content-visible unless-format="ipynb"}
+:::{.callout-tip}
+
+To do this assignment in Julia, you can find a Jupyter notebook with an appropriate environment in [the homework's Github repository]({{< var github_org.repo >}}/hw04). Otherwise, you will be responsible for setting up an appropriate package environment in the language of your choosing. Make sure to include your name and NetID on your solution.
+:::
+:::
+
+## Overview
+
+::: {.cell .markdown}
+
+### Instructions
+
+The goal of this homework assignment is to practice probabilistic model calibration and using the resulting distributions for model evaluation and selection.
+
+
+:::
+
+::: {.cell .markdown}
+
+### Learning Outcomes
+
+After completing this assignments, students will be able to:
+
+* quantify uncertainty in model parameters with probabilistic programming.
+* use information criteria to assess the relative evidence for models.
+
+:::
+
+::: {.cell .markdown}
+### Load Environment
+
+The following code loads the environment and makes sure all needed packages are installed. This should be at the start of most Julia scripts.
+
+:::
+
+```{julia}
+#| output: false
+
+import Pkg
+Pkg.activate(@__DIR__)
+Pkg.instantiate()
+```
+
+::: {.cell .markdown}
+The following packages are included in the environment (to help you find other similar packages in other languages). The code below loads these packages for use in the subsequent notebook (the desired functionality for each package is commented next to the package).
+
+:::
+
+```{julia}
+#| output: false
+
+using Random # random number generation and seed-setting
+using DataFrames # tabular data structure
+using DataFramesMeta # API which can simplify chains of DataFrames transformations
+using CSVFiles # reads/writes .csv files
+using Distributions # interface to work with probability distributions
+using Plots # plotting library
+using StatsBase # statistical quantities like mean, median, etc
+using StatsPlots # some additional statistical plotting tools
+```
+
+## Problems (Total: 30 Points)
+
+### Problem 1
+
+::: {.cell .markdown}
+
+This problem is the same as the MCMC Lab from earlier in this semester.
+
+You will use a probabilistic programming language to fit a linear model for monthly mean tide gauge data from the [Sewell's Point, VA tide gauge](https://tidesandcurrents.noaa.gov/waterlevels.html?id=8638610) from 1927 through 2022, obtained from the [Permanent Service for Mean Sea Level](https://psmsl.org/data/obtaining/stations/299.php). The data (in `data/norfolk-monthly-tide-data.txt`) has been slightly cleaned by setting dates to the `yyyy-mm` format. We've left missing values as `-99999`; make sure to fix those as appropriate for your programming language.
+
+```{julia}
+#| output: true
+#| echo: true
+
+tide_dat = CSV.read("data/norfolk-monthly-tide-data.txt", DataFrame)
+# replace -99999 with missing
+tide_dat.gauge = ifelse.(tide_dat.gauge .== -99999, missing, tide_dat.gauge)
+```
+
+Now let's plot the data.
+
+```{julia}
+#| label: fig-data-plot
+#| fig-cap: "Plotted tide gauge data"
+#| fig-align: center
+
+scatter(tide_dat.datetime, tide_dat.gauge, xlabel="Month", ylabel="Monthly Mean Sea Level (mm)", legend=false)
+```
+
+We would like to quantify the uncertainty in the time-trend of this local sea level increase (which includes global mean sea level rise but also more local effects, such as subsidence). The plot in @fig-data-plot looks roughly linear, so let's use the following model (assuming the errors are independent and identically-distributed for simplicity):
+
+\begin{equation*}
+\begin{aligned}
+y(t) &= \alpha + \beta t + \varepsilon \\
+\varepsilon &\sim \mathcal{N}(0, \sigma).
+\end{aligned}
+\label{eq-model}
+\end{equation*}
+
+**In this problem**: 
+
+* Write a model for the regression in \eqref{eq-model} in the probabilistic programming language of your choice. You'll need to pick some priors for $\alpha$, $\beta$, and $\sigma$. 
+*  Sample from the posterior with four chains (for convergence diagnostics). 
+*  Evaluate convergence. How many iterations did you use? What is the effective sample size?
+*  Plot the posterior distributions. In particular, we are interested in uncertainty in the $\beta$ coefficient, which reflects the mean increase in sea-level rise over time in mm/months. 
+*  Generate hindcasts by sampling from the posterior distribution and simulating data. If you plot the 95% posterior predictive distribution and the data, how does it look? 
+:::
+
+### Problem 2
+
+::: {.cell .markdown}
+
+Building on Problem 1, suppose we wanted to examine if the increase in sea level at Norfolk was quadratic instead of linear. 
+
+**In this problem**: 
+
+* Fit a quadratic model (with the same error structure) to the same data. What are the estimates? 
+* Plot the linear and quadratic fits along with the data. Do you visually see any differences?
+* Compute the log-posterior, AIC, and DIC for each model. Based on these metrics, what would you conclude about the relative evidence for each model? What are your conclusions about whether the sea level trend is linear or quadratic?
+
+:::
