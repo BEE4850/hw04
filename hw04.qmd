@@ -1,5 +1,5 @@
 ---
-title: "Homework 4: Simulation-Based Uncertainty Quantification"
+title: "Homework 4: The Bootstrap"
 subtitle: "BEE 4850/5850, Fall 2025"
 format:
     html:        
@@ -59,9 +59,9 @@ To do this assignment in Julia, you can find a Jupyter notebook with an appropri
 
 The goal of this homework assignment is to practice simulation-based uncertainty quantification, focusing on the bootstrap.
 
-* Problem 1 asks you to use a moving block bootstrap to estimate the median of extreme water level data.
+* Problem 1 asks you to use the non-parametric bootstrap to estimate uncertainty in a Poisson regression model.
 * Problem 2 asks you to use the bootstrap (through resampling residuals) to estimate uncertainty in a semi-empirical sea-level rise model.
-* Problem 3 (only required for students in BEE 5850) asks you to use the bootstrap to quantify uncertainties in the gender-impact-on-hurricane-damages dataset from Homework 2.
+* Problem 3 (only required for students in BEE 5850) asks you to use a moving block bootstrap to estimate the sampling distribution of the median of extreme water level data.
 
 
 ### Load Environment
@@ -104,25 +104,13 @@ using StatsPlots # some additional statistical plotting tools
 
 ### Problem 1
 
- We want to quantify uncertainty in the linear trend of monthly mean tide gauge data from the [Sewell's Point, VA tide gauge](https://tidesandcurrents.noaa.gov/waterlevels.html?id=8638610) from 1927 through 2022, obtained from the [Permanent Service for Mean Sea Level](https://psmsl.org/data/obtaining/stations/299.php). The data (in `data/norfolk-monthly-tide-data.txt`) has been slightly cleaned by setting dates to the `yyyy-mm` format. We've left missing values as `-99999`, which we will replace as `missing` in Julia; make sure to fix those as appropriate for your programming language.
+ Revisit the salamander model from [Homework 2](https://viveks.me/simulation-data-analysis/hw/hw02.html), using percent groundcover as a predictor in the Poisson regression. Use the non-parametric bootstrap to estimate bias and confidence intervals for the model parameters.
 
-```{julia}
-#| output: true
-#| echo: true
+**In this problem**: 
 
-tide_dat = CSV.read("data/norfolk-monthly-tide-data.txt", DataFrame)
-# replace -99999 with missing
-tide_dat.gauge = ifelse.(tide_dat.gauge .== -99999, missing, tide_dat.gauge)
-
-p = scatter(tide_dat.datetime, tide_dat.gauge, xlabel="Month", ylabel="Monthly Mean Sea Level (mm)", legend=false)
-```
-
-**In this problem**:
-
-* Fit a linear model (with Gaussian errors) to the data and plot the resulting fit. What is your estimate of the monthly sea-level trend?
-* Use the residual-resampling scheme to create 1,000 bootstrap replicates of the data. What is the associated 90% confidence interval for the trend? Is the estimate biased?
-* Repeat the analysis using the parametric bootstrap for your Gaussian model. How do your estimates of the 90% confidence interval and bias change?
-* Why do you think these two analyses produced (or didn't produce) any differences?
+* Load the data from `data/salamanders.csv`. 
+* Fit a Poisson regression model for salamander counts using the percentage of ground cover.
+* Use 1,000 non-parametric bootstrap samples to obtain estimates of bias and the 90% confidence interval for the intercept and coefficient in the Poisson regression.
 
 ### Problem 2
 
@@ -154,13 +142,11 @@ We would like to quantify uncertainty in the model parameters using the bootstra
 
 ### Problem 3
 
-Let's revisit the 2015 Sewell's Point tide gauge data, which consists of hourly observations and predicted sea-level based on NOAA's harmonic model, as shown in @fig-norfolk-data.
+Let's revisit the 2015 Sewell's Point tide gauge data, which consists of hourly observations and predicted sea-level based on NOAA's harmonic model.
 
 ```{julia}
 #| output: true
 #| echo: true
-#| label: fig-norfolk-data
-#| fig-cap: "2015 data from the Sewell's Point tide gauge, including NOAA's predictions for sea-level harmonics."
 
 function load_data(fname)
     date_format = "yyyy-mm-dd HH:MM"
@@ -184,13 +170,11 @@ plot(dat.datetime, dat.gauge; ylabel="Gauge Measurement (m)", label="Observed", 
 plot!(dat.datetime, dat.harmonic, label="Prediction", color=:orange)
 ```
 
-We detrend the data to isolate the weather-induced variability by subtracting the predictions from the observations; the results (following the Julia code) are in `dat[:, :weather]`, visualized in @fig-norfolk-data-detrend. 
+We detrend the data to isolate the weather-induced variability by subtracting the predictions from the observations; the results (following the Julia code) are in `dat[:, :weather]`. 
 
 ```{julia}
 #| output: true
 #| echo: true
-#| label: fig-norfolk-data-detrend
-#| fig-cap: "Detrended 2015 data from the Sewell's Point tide gauge."
 
 plot(dat.datetime, dat.weather; ylabel="Gauge Weather Variability (m)", label="Detrended Data", linewidth=1, legend=:topleft, xlabel="Date/Time")
 ```
@@ -199,5 +183,6 @@ We would like to understand the uncertainty in an estimate of the median sea lev
 
 **In this problem**:
 
-* Construct 1,000 bootstrap replicates by adding a moving block bootstrap replicate from the weather-induced variability series (with block length 20) to the harmonic prediction. Use these replicates to compute a 95% confidence interval for the median. What is the bias of the estimator?
+* Construct 1,000 bootstrap replicates by adding a moving block bootstrap replicate from the weather-induced variability series (with block length 20) to the harmonic prediction. Use these replicates to compute a 90% confidence interval. What is the bias of the estimator?
 * Repeat the analysis with block length 50. How does this affect the confidence intervals and estimate of bias?
+* Why do you think using different block lengths produced the results that they did?

@@ -1,4 +1,4 @@
-# Homework 4: Simulation-Based Uncertainty Quantification
+# Homework 4: The Bootstrap
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -10,9 +10,7 @@ If enrolled in the class, a PDF of the completed assignment, **with all cells ev
 
 After completing this assignments, students will be able to:
 
-* quantify uncertainty in statistical quantities using the non-parametric and parametric bootstraps as well as Markov chain Monte Carlo;
-* use probabilistic programming languages to implement Bayesian probability models;
-* compare the outcomes from the non-parametric and parametric bootstraps.
+* quantify uncertainty in statistical quantities using the non-parametric and parametric bootstraps.
 
 
 ## Repository Overview
