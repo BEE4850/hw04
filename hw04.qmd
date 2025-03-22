@@ -1,6 +1,6 @@
 ---
-title: "Homework 4: Probabilistic Calibration and Model Selection"
-subtitle: "BEE 4850/5850, Fall 2024"
+title: "Homework 4: Simulation-Based Uncertainty Quantification"
+subtitle: "BEE 4850/5850, Fall 2025"
 format:
     html:        
         warning: true
@@ -27,7 +27,7 @@ format:
     ipynb:
         warning: true
         error: true
-jupyter: julia-1.9
+engine: julia
 format-links: [pdf]
 freeze: false
 ---
@@ -41,7 +41,7 @@ freeze: false
 ::: {.callout-important icon=false}
 ### Due Date
 
-Friday, 5/03/24, 9:00pm
+Friday, 3/28/25, 9:00pm
 :::
 
 ::: {.content-visible unless-format="ipynb"}
@@ -57,16 +57,11 @@ To do this assignment in Julia, you can find a Jupyter notebook with an appropri
 
 ### Instructions
 
-The goal of this homework assignment is to practice probabilistic model calibration and using the resulting distributions for model evaluation and selection.
+The goal of this homework assignment is to practice simulation-based uncertainty quantification, focusing on the bootstrap.
 
-
-
-### Learning Outcomes
-
-After completing this assignments, students will be able to:
-
-* quantify uncertainty in model parameters with probabilistic programming.
-* use information criteria to assess the relative evidence for models.
+* Problem 1 asks you to use a moving block bootstrap to estimate the median of extreme water level data.
+* Problem 2 asks you to use the bootstrap (through resampling residuals) to estimate uncertainty in a semi-empirical sea-level rise model.
+* Problem 3 (only required for students in BEE 5850) asks you to use the bootstrap to quantify uncertainties in the gender-impact-on-hurricane-damages dataset from Homework 2.
 
 
 ### Load Environment
@@ -92,21 +87,24 @@ The following packages are included in the environment (to help you find other s
 using Random # random number generation and seed-setting
 using DataFrames # tabular data structure
 using DataFramesMeta # API which can simplify chains of DataFrames transformations
-using CSVFiles # reads/writes .csv files
+using CSV # reads/writes .csv files
 using Distributions # interface to work with probability distributions
 using Plots # plotting library
 using StatsBase # statistical quantities like mean, median, etc
 using StatsPlots # some additional statistical plotting tools
 ```
 
-## Problems (Total: 30 Points)
+## Problems 
+
+### Scoring
+
+* Problem 1 is worth 10 points;
+* Problem 2 is worth 10 points;
+* Problem 3 is worth 5 points;
 
 ### Problem 1
 
-
-This problem is the same as the MCMC Lab from earlier in this semester.
-
-You will use a probabilistic programming language to fit a linear model for monthly mean tide gauge data from the [Sewell's Point, VA tide gauge](https://tidesandcurrents.noaa.gov/waterlevels.html?id=8638610) from 1927 through 2022, obtained from the [Permanent Service for Mean Sea Level](https://psmsl.org/data/obtaining/stations/299.php). The data (in `data/norfolk-monthly-tide-data.txt`) has been slightly cleaned by setting dates to the `yyyy-mm` format. We've left missing values as `-99999`; make sure to fix those as appropriate for your programming language.
+ We want to quantify uncertainty in the linear trend of monthly mean tide gauge data from the [Sewell's Point, VA tide gauge](https://tidesandcurrents.noaa.gov/waterlevels.html?id=8638610) from 1927 through 2022, obtained from the [Permanent Service for Mean Sea Level](https://psmsl.org/data/obtaining/stations/299.php). The data (in `data/norfolk-monthly-tide-data.txt`) has been slightly cleaned by setting dates to the `yyyy-mm` format. We've left missing values as `-99999`, which we will replace as `missing` in Julia; make sure to fix those as appropriate for your programming language.
 
 ```{julia}
 #| output: true
@@ -115,43 +113,91 @@ You will use a probabilistic programming language to fit a linear model for mont
 tide_dat = CSV.read("data/norfolk-monthly-tide-data.txt", DataFrame)
 # replace -99999 with missing
 tide_dat.gauge = ifelse.(tide_dat.gauge .== -99999, missing, tide_dat.gauge)
+
+p = scatter(tide_dat.datetime, tide_dat.gauge, xlabel="Month", ylabel="Monthly Mean Sea Level (mm)", legend=false)
 ```
 
-Now let's plot the data.
+**In this problem**:
+
+* Fit a linear model (with Gaussian errors) to the data and plot the resulting fit. What is your estimate of the monthly sea-level trend?
+* Use the residual-resampling scheme to create 1,000 bootstrap replicates of the data. What is the associated 90% confidence interval for the trend? Is the estimate biased?
+* Repeat the analysis using the parametric bootstrap for your Gaussian model. How do your estimates of the 90% confidence interval and bias change?
+* Why do you think these two analyses produced (or didn't produce) any differences?
+
+### Problem 2
+
+Revisit the sea-level rise model from [Homework 2](https://viveks.me/simulation-data-analysis/hw/hw02.html):
+
+$$\begin{aligned}
+\frac{dS}{dt} &= \frac{S_\text{eq} - S}{\tau} \\
+S_\text{eq} &= aT + b,
+\end{aligned}
+$$
+
+where
+
+- $S(t)$ is the global mean sea level (in mm) at time $t$;
+- $\tau$ is the response time of sea level (in yrs);
+- $S_\text{eq}$ is the equilibrium sea-level (in mm) at temperature $T$ (in $^\circ$C);
+- $a$ is the sensitivity of $S_\text{eq}$ to $T$ (in mm/$^\circ$C);
+- $b$ is the intercept of $S_\text{eq}$, or the $S_\text{eq}$ when $T=0^\circ$C (in mm).
+
+We would like to quantify uncertainty in the model parameters using the bootstrap.
+
+**In this problem**: 
+
+* Load the data from the `data/` folder and, following Grinsted et al (2010), normalize both datasets to the 1980-1999 mean (subtract that mean from the data).
+  * Global mean temperature data from the HadCRUT 5.0.2.0 dataset (<https://hadobs.metoffice.gov.uk/hadcrut5/data/HadCRUT.5.0.2.0/download.html>) can be found in `data/HadCRUT.5.0.2.0.analysis.summary_series.global.annual.csv`. This data is averaged over the Northern and Southern Hemispheres and over the whole year. 
+  * Global mean sea level anomalies (relative to the 1990 mean global sea level) are in `data/CSIRO_Recons_gmsl_yr_2015.csv`, courtesy of CSIRO (<https://www.cmar.csiro.au/sealevel/sl_data_cmar.html>). The standard deviation of the estimate is also added for each year.
+* Write a function to simulate global mean sea levels under a set of model parameters after discretizing the equations above with a timestep of $\delta t = 1$ yr. You will need to subset the temperature data to the years where you also have sea-level data and include an initial sea-level parameter $S_0$. This will be similar to the model from Homework 2. Fit this model to the data with AR(1) residuals.
+* Use your fitted model and the AR(1) residual process to generate 1,000 parametric bootstrap samples. Refit the model to each. Plot histograms of the bootstrap samples for each parameter. What is the 90% confidence interval for the sensitivity of sea level to global mean temperature?
+
+### Problem 3
+
+Let's revisit the 2015 Sewell's Point tide gauge data, which consists of hourly observations and predicted sea-level based on NOAA's harmonic model, as shown in @fig-norfolk-data.
 
 ```{julia}
 #| output: true
 #| echo: true
+#| label: fig-norfolk-data
+#| fig-cap: "2015 data from the Sewell's Point tide gauge, including NOAA's predictions for sea-level harmonics."
 
-p = scatter(tide_dat.datetime, tide_dat.gauge, xlabel="Month", ylabel="Monthly Mean Sea Level (mm)", legend=false)
-display(p)
+function load_data(fname)
+    date_format = "yyyy-mm-dd HH:MM"
+    # this uses the DataFramesMeta package -- it's pretty cool
+    return @chain fname begin
+        CSV.File(; dateformat=date_format)
+        DataFrame
+        rename(
+            "Time (GMT)" => "time", "Predicted (m)" => "harmonic", "Verified (m)" => "gauge"
+        )
+        @transform :datetime = (Date.(:Date, "yyyy/mm/dd") + Time.(:time))
+        select(:datetime, :gauge, :harmonic)
+        @transform :weather = :gauge - :harmonic
+        @transform :month = (month.(:datetime))
+    end
+end
+
+dat = load_data("data/norfolk-hourly-surge-2015.csv")
+
+plot(dat.datetime, dat.gauge; ylabel="Gauge Measurement (m)", label="Observed", legend=:topleft, xlabel="Date/Time", color=:blue)
+plot!(dat.datetime, dat.harmonic, label="Prediction", color=:orange)
 ```
 
-We would like to quantify the uncertainty in the time-trend of this local sea level increase (which includes global mean sea level rise but also more local effects, such as subsidence). The plot in looks roughly linear, so let's use the following model (assuming the errors are independent and identically-distributed for simplicity):
+We detrend the data to isolate the weather-induced variability by subtracting the predictions from the observations; the results (following the Julia code) are in `dat[:, :weather]`, visualized in @fig-norfolk-data-detrend. 
 
-\begin{equation*}
-\begin{aligned}
-y(t) &= \alpha + \beta t + \varepsilon \\
-\varepsilon &\sim \mathcal{N}(0, \sigma).
-\end{aligned}
-\label{eq-model}
-\end{equation*}
+```{julia}
+#| output: true
+#| echo: true
+#| label: fig-norfolk-data-detrend
+#| fig-cap: "Detrended 2015 data from the Sewell's Point tide gauge."
 
-**In this problem**: 
+plot(dat.datetime, dat.weather; ylabel="Gauge Weather Variability (m)", label="Detrended Data", linewidth=1, legend=:topleft, xlabel="Date/Time")
+```
 
-* Write a model for the linear regression above in the probabilistic programming language of your choice. You'll need to pick some priors for $\alpha$, $\beta$, and $\sigma$. 
-*  Sample from the posterior with four chains (for convergence diagnostics). 
-*  Evaluate convergence. How many iterations did you use? What is the effective sample size?
-*  Plot the posterior distributions. In particular, we are interested in uncertainty in the $\beta$ coefficient, which reflects the mean increase in sea-level rise over time in mm/months. 
-*  Generate hindcasts by sampling from the posterior distribution and simulating data. If you plot the 95% posterior predictive distribution and the data, how does it look? 
+We would like to understand the uncertainty in an estimate of the median sea level.
 
-### Problem 2
+**In this problem**:
 
-Building on Problem 1, suppose we wanted to examine if the increase in sea level at Norfolk was quadratic instead of linear. 
-
-**In this problem**: 
-
-* Fit a quadratic model (with the same error structure) to the same data. What are the estimates? 
-* Plot the linear and quadratic fits along with the data. Do you visually see any differences?
-* Compute the log-posterior, AIC, and DIC for each model. Based on these metrics, what would you conclude about the relative evidence for each model? What are your conclusions about whether the sea level trend is linear or quadratic?
-
+* Construct 1,000 bootstrap replicates by adding a moving block bootstrap replicate from the weather-induced variability series (with block length 20) to the harmonic prediction. Use these replicates to compute a 95% confidence interval for the median. What is the bias of the estimator?
+* Repeat the analysis with block length 50. How does this affect the confidence intervals and estimate of bias?
