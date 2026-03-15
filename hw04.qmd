@@ -1,5 +1,5 @@
 ---
-title: "Homework 4: The Bootstrap"
+title: "Homework 4: Model Evaluation and Comparison"
 subtitle: "BEE 4850/5850, Fall 2025"
 format:
     html:        
@@ -29,7 +29,7 @@ format:
         error: true
 engine: julia
 julia:
-    exeflags: ["+1.10.4"]
+    exeflags: ["+1.11.5"]
 format-links: [pdf]
 freeze: false
 ---
@@ -43,7 +43,7 @@ freeze: false
 ::: {.callout-important icon=false}
 ### Due Date
 
-Friday, 3/28/25, 9:00pm
+Friday, 3/27/26, 9:00pm
 :::
 
 ::: {.content-visible unless-format="ipynb"}
@@ -59,11 +59,11 @@ To do this assignment in Julia, you can find a Jupyter notebook with an appropri
 
 ### Instructions
 
-The goal of this homework assignment is to practice simulation-based uncertainty quantification, focusing on the bootstrap.
+The goal of this homework assignment is to practice model evaluation and using cross-validation and information criteria to distinguish between models.
 
-* Problem 1 asks you to use the non-parametric bootstrap to estimate uncertainty in a Poisson regression model.
-* Problem 2 asks you to use the bootstrap (through resampling residuals) to estimate uncertainty in a semi-empirical sea-level rise model.
-* Problem 3 (only required for students in BEE 5850) asks you to use a moving block bootstrap to estimate the sampling distribution of the median of extreme water level data.
+* Problem 1 asks you to fit a model for cherry blossom bloom dates and use cross-validation to draw conclusions about generalizability.
+* Problem 2 asks you to compare several linear regression models for environmental influences on non-accidental death data.
+
 
 
 ### Load Environment
@@ -94,6 +94,7 @@ using Distributions # interface to work with probability distributions
 using Plots # plotting library
 using StatsBase # statistical quantities like mean, median, etc
 using StatsPlots # some additional statistical plotting tools
+using Optim # optimization package for model fitting
 ```
 
 ## Problems 
@@ -101,90 +102,72 @@ using StatsPlots # some additional statistical plotting tools
 ### Scoring
 
 * Problem 1 is worth 10 points;
-* Problem 2 is worth 10 points;
-* Problem 3 is worth 5 points;
+* Problem 2 is worth 15 points;
 
 ### Problem 1
 
- Revisit the salamander model from [Homework 2](https://viveks.me/simulation-data-analysis/hw/hw02.html), using percent groundcover as a predictor in the Poisson regression. Use the non-parametric bootstrap to estimate bias and confidence intervals for the model parameters.
+Let's examine the influence of global temperature change on the blooming day of cherry blossoms in Kyoto. While these dates are discrete, we will use a linear regression model relating the day to the global mean temperature anomaly for March (the third non-year column in `data/HadCRUT5.1Analysis_gl.txt`).
 
-**In this problem**: 
+#### Problem 1.1
 
-* Load the data from `data/salamanders.csv`. 
-* Fit a Poisson regression model for salamander counts using the percentage of ground cover.
-* Use 1,000 non-parametric bootstrap samples to obtain estimates of bias and the 90% confidence interval for the intercept and coefficient in the Poisson regression.
+Load the data and fit this model. What does your fitted model suggest as the influence of March temperature anomalies on the cherry blossom date?
+
+#### Problem 1.2
+
+Calculate the log-loss (negative log-probability) and mean-squared error metrics for the fitted model on the in-sample data. 
+
+#### Problem 1.3
+
+Conduct a 5-fold cross-validation for the model using both of these metrics. How do they compare to the in-sample metrics?
+
+#### Problem 1.4
+
+What conclusions can you draw about the model's generalizability?
+ 
 
 ### Problem 2
 
-Revisit the sea-level rise model from [Homework 2](https://viveks.me/simulation-data-analysis/hw/hw02.html):
+Let's re-examine the influence of air pollution and temperature on mortality in Chicago, IL.  The `data/chicago.csv` dataset (originally from the [`gamair` `R` package](https://cran.r-project.org/web/packages/gamair/index.html))contains data on the relationship between environmental conditions (temperature and air quality) and deaths in Chicago from 1987--2000. The variables are:
 
-$$\begin{aligned}
-\frac{dS}{dt} &= \frac{S_\text{eq} - S}{\tau} \\
-S_\text{eq} &= aT + b,
-\end{aligned}
-$$
+* the total number of (non-accidental)
+deaths each day (`death`); 
+* the median density over the city of large pollutant particles (PM10; `pm10median`); 
+* the median density of smaller pollutant particles (PM2.5; `pm25median`); 
+* the median concentration of ozone (O$_3$) in the air (`o3median`); the median concentration of sulfur dioxide (SO$_2$) in the air (`so2median`); 
+* the time in days (`time`); and the daily mean temperature (`tmpd`). 
 
-where
-
-- $S(t)$ is the global mean sea level (in mm) at time $t$;
-- $\tau$ is the response time of sea level (in yrs);
-- $S_\text{eq}$ is the equilibrium sea-level (in mm) at temperature $T$ (in $^\circ$C);
-- $a$ is the sensitivity of $S_\text{eq}$ to $T$ (in mm/$^\circ$C);
-- $b$ is the intercept of $S_\text{eq}$, or the $S_\text{eq}$ when $T=0^\circ$C (in mm).
-
-We would like to quantify uncertainty in the model parameters using the bootstrap.
-
-**In this problem**: 
-
-* Load the data from the `data/` folder and, following Grinsted et al (2010), normalize both datasets to the 1980-1999 mean (subtract that mean from the data).
-  * Global mean temperature data from the HadCRUT 5.0.2.0 dataset (<https://hadobs.metoffice.gov.uk/hadcrut5/data/HadCRUT.5.0.2.0/download.html>) can be found in `data/HadCRUT.5.0.2.0.analysis.summary_series.global.annual.csv`. This data is averaged over the Northern and Southern Hemispheres and over the whole year. 
-  * Global mean sea level anomalies (relative to the 1990 mean global sea level) are in `data/CSIRO_Recons_gmsl_yr_2015.csv`, courtesy of CSIRO (<https://www.cmar.csiro.au/sealevel/sl_data_cmar.html>). The standard deviation of the estimate is also added for each year.
-* Write a function to simulate global mean sea levels under a set of model parameters after discretizing the equations above with a timestep of $\delta t = 1$ yr. You will need to subset the temperature data to the years where you also have sea-level data and include an initial sea-level parameter $S_0$. This will be similar to the model from Homework 2. Fit this model to the data with AR(1) residuals.
-* Use your fitted model and the AR(1) residual process to generate 1,000 parametric bootstrap samples. Refit the model to each. Plot histograms of the bootstrap samples for each parameter. What is the 90% confidence interval for the sensitivity of sea level to global mean temperature?
-
-### Problem 3
-
-Let's revisit the 2015 Sewell's Point tide gauge data, which consists of hourly observations and predicted sea-level based on NOAA's harmonic model.
+The pollution variables have been standardized to represent deviations from the overall median and the temperature is in Fahrenheit. The days are given as a number of days relative to December 31, 1993. Note that some values are missing; these can be treated as missing at random and dropped in your regressions.
 
 ```{julia}
-#| output: true
-#| echo: true
+#| label: chicago-deaths
 
-function load_data(fname)
-    date_format = "yyyy-mm-dd HH:MM"
-    # this uses the DataFramesMeta package -- it's pretty cool
-    return @chain fname begin
-        CSV.File(; dateformat=date_format)
-        DataFrame
-        rename(
-            "Time (GMT)" => "time", "Predicted (m)" => "harmonic", "Verified (m)" => "gauge"
-        )
-        @transform :datetime = (Date.(:Date, "yyyy/mm/dd") + Time.(:time))
-        select(:datetime, :gauge, :harmonic)
-        @transform :weather = :gauge - :harmonic
-        @transform :month = (month.(:datetime))
-    end
-end
+chicago_dat = CSV.read("data/chicago.csv", DataFrame; delim=',', header=true, missingstring="NA") # <1>
+day_zero = Date("1993-12-31")
+chicago_dat.Date = day_zero .+ Day.(chicago_dat.time .+ 0.5) # <2>
 
-dat = load_data("data/norfolk-hourly-surge-2015.csv")
-
-plot(dat.datetime, dat.gauge; ylabel="Gauge Measurement (m)", label="Observed", legend=:topleft, xlabel="Date/Time", color=:blue)
-plot!(dat.datetime, dat.harmonic, label="Prediction", color=:orange)
+plot(chicago_dat.Date, chicago_dat.death, lw=2, xlabel="Date", ylabel="Non-Accidental Deaths)", legend=false)
 ```
+1. The datafile imports columns with `NA` values by default as `String` types, but we want them to be numerical, so we need to explicitly ask `CSV.read` to read in columns as `Float`.
+2. To get the correct calendar date, we need to add 0.5 to the `time` column to make the offset into integers.
 
-We detrend the data to isolate the weather-induced variability by subtracting the predictions from the observations; the results (following the Julia code) are in `dat[:, :weather]`. 
+#### Problem 2.1
 
-```{julia}
-#| output: true
-#| echo: true
+Load and plot the deaths data. Linearly regress the number of deaths against time and report the coefficients for the fitted model. Add the regression line to your plot. What does this regression tell you?
 
-plot(dat.datetime, dat.weather; ylabel="Gauge Weather Variability (m)", label="Detrended Data", linewidth=1, legend=:topleft, xlabel="Date/Time")
-```
+#### Problem 2.2
 
-We would like to understand the uncertainty in an estimate of the median sea level.
+Now linearly regress the deaths data against temperature. Once again, report the coefficients, and add the regression line to your plot. What does this regression tell you about the influence of temperature?
 
-**In this problem**:
+#### Problem 2.3
 
-* Construct 1,000 bootstrap replicates by adding a moving block bootstrap replicate from the weather-induced variability series (with block length 20) to the harmonic prediction. Use these replicates to compute a 90% confidence interval. What is the bias of the estimator?
-* Repeat the analysis with block length 50. How does this affect the confidence intervals and estimate of bias?
-* Why do you think using different block lengths produced the results that they did?
+Expand your previous model by regressing deaths against temperature and PM2.5 density. Report the coefficients and add this regression line to your plot. 
+
+#### Problem 2.4
+
+Conduct a 5-fold cross-validation for the temperature only and temperature and PM2.5 models, using both the mean-squared-error and log-probability metrics. Are there any structures in the dataset that you need to account for when developing your cross-validation folds? Which model performs the best? What can you conclude from this analysis?
+
+#### Problem 2.5
+
+Compute the AICs for the three fitted models and compare them. What do they tell you about the relative evidence for the influence of temperature and PM2.5 density on deaths? How do your conclusions based on AIC compare to those you might draw from your regression coefficients, plots, and cross-validation?
+
+## References
