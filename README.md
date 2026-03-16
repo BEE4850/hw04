@@ -27,3 +27,23 @@ The repository consists of the following files:
 - `.github/`: This folder contains workflow files which generate the notebook. Again, you shouldn't need to touch this.
 - `data/`: This folder contains several .csvs and other data files to complete the projects.
 
+## Prerequisites
+
+### Julia
+
+[Julia](https://julialang.org/downloads/): This notebook was developed with version 1.11.5, but any 1.11.x should work (there could be some issues with other versions, depending on what's changed). You can solve this assignment using other languages, but the provided notebook is based on Julia.
+
+### Packages
+
+These are provided in the project environment assuming the assignment will be solved in Julia; similar packages from other languages can be used instead.
+
+1. `DataFrames.jl`: tabular data structure
+2. `DataFramesMeta.jl`: macros to simplify DataFrames.jl commands
+2. `CSV.jl`: reads/writes .csv files
+3. `Distributions.jl`: interface to work with probability distributions
+4. `Plots.jl`: plotting library
+5. `StatsBase.jl`: statistical quantities like mean, median, etc
+6. `StatsPlots.jl`: some additional statistical plotting tools
+7. `Optim.jl`: optimization tools
+8. `LaTeXStrings.jl`: latex formatting for plot strings
+9. `Dates.jl`: API for time-date units.
