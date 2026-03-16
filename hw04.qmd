@@ -95,6 +95,7 @@ using Plots # plotting library
 using StatsBase # statistical quantities like mean, median, etc
 using StatsPlots # some additional statistical plotting tools
 using Optim # optimization package for model fitting
+using Dates # API for date-time data structures
 ```
 
 ## Problems 
